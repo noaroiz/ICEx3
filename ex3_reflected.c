@@ -11,7 +11,7 @@
 
 #define HOST "http://localhost:8080/"
 #define PATH "/gradesPortal.php"
-#define SERVER_IP "192.168.1.201"
+#define SERVER_IP "192.168.1.202"
 #define WEBSERVER_IP "192.168.1.203"
 
 int hexval(char c) {
