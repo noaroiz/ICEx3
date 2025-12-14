@@ -1,3 +1,6 @@
+//should run from attacker server
+//need to add socket instructions for automated tests
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
